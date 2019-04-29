@@ -26,9 +26,8 @@ type Model = { Counter: Counter option }
 type Msg =
 | Increment
 | Decrement
+| Reload
 | InitialCountLoaded of Result<Counter, exn>
-
-
 
 module Server =
 
@@ -44,18 +43,17 @@ module Server =
 
 let initialCounter = Server.api.initialCounter
 
+let loadCountCmd =
+    Cmd.ofAsync
+        initialCounter
+        ()
+        (Ok >> InitialCountLoaded)
+        (Error >> InitialCountLoaded)
+
 // defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> =
     let initialModel = { Counter = None }
-    let loadCountCmd =
-        Cmd.ofAsync
-            initialCounter
-            ()
-            (Ok >> InitialCountLoaded)
-            (Error >> InitialCountLoaded)
     initialModel, loadCountCmd
-
-
 
 // The update function computes the next state of the application based on the current state and the incoming events/messages
 // It can also run side-effects (encoded as commands) like calling the server via Http.
@@ -71,7 +69,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | _, InitialCountLoaded (Ok initialCount)->
         let nextModel = { Counter = Some initialCount }
         nextModel, Cmd.none
-
+    | _, Reload -> currentModel, loadCountCmd
     | _ -> currentModel, Cmd.none
 
 
@@ -118,7 +116,8 @@ let view (model : Model) (dispatch : Msg -> unit) =
                     [ Heading.h3 [] [ str ("Press buttons to manipulate counter: " + show model) ] ]
                 Columns.columns []
                     [ Column.column [] [ button "-" (fun _ -> dispatch Decrement) ]
-                      Column.column [] [ button "+" (fun _ -> dispatch Increment) ] ] ]
+                      Column.column [] [ button "+" (fun _ -> dispatch Increment) ]
+                      Column.column [] [ button "Reload" (fun _ -> dispatch Reload) ] ] ]
 
           Footer.footer [ ]
                 [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
